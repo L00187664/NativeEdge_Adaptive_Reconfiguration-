@@ -1,0 +1,10 @@
+vm_resources:
+  172.27.50.159:
+    cpu: 4
+    memory: 2048Mi
+  172.27.50.160:
+    cpu: 2
+    memory: 2048Mi
+  172.27.50.161:
+    cpu: 2
+    memory: 2048Mi

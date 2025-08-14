@@ -1,0 +1,161 @@
+capabilities:
+  web_endpoint1:
+    description: The endpoint to access the point of sale system
+    value:
+      concat:
+      - http://
+      - get_attribute:
+        - vm_node_01
+        - capabilities
+        - vm_public_ip
+      - :3008
+description: 'Deploys a VM onto a NativeEdge Endpoint and configures it
+
+  '
+imports:
+- virtual_machine.yaml
+- nativeedge/types/types.yaml
+- plugin:nativeedge-plugin
+- plugin:nativeedge-ansible-plugin
+- plugin:nativeedge-fabric-plugin
+- plugin:nativeedge-utilities-plugin
+inputs:
+  artifact_configuration_secret_name:
+    description: 'Name of secret with details needed for binary image and artifacts
+      download
+
+      '
+    display_label: Artifact Configuration Secret Name
+    type: secret_key
+  binary_image_artifact_access_token:
+    default:
+      get_secret:
+      - get_input: artifact_configuration_secret_name
+      - binary_image_access_token
+    description: External repo access token
+    display_label: External repo access token for binary download
+    hidden: true
+    required: false
+  binary_image_artifact_url:
+    default:
+      get_secret:
+      - get_input: artifact_configuration_secret_name
+      - binary_image_url
+    description: External repo URL of the binary image
+    display_label: External repo URL of the binary image
+    hidden: true
+    type: string
+  binary_image_artifact_usename:
+    default:
+      get_secret:
+      - get_input: artifact_configuration_secret_name
+      - binary_image_access_user
+    description: External repo username for binary download
+    display_label: External repo username
+    hidden: true
+    required: false
+    type: string
+  cpu:
+    constraints:
+    - in_range:
+      - 2
+      - 20
+    default: 4
+    description: Number of CPUs for the deployed VM.
+    display_label: CPUs
+    type: integer
+  disk:
+    default: /DataStore0
+    description: The data store on the NativeEdge Endpoint for the VM.
+    display_label: Disk
+    type: string
+  memory:
+    default: 24GB
+    description: Amount of RAM, in GB, for the deployed VM.
+    display_label: Memory
+    type: string
+  name:
+    description: Friendly name for the deployment.
+    display_label: Deployment Name
+    type: string
+  network_name:
+    default: BRIDGED
+    description: Name of the network on the Endpoint to attach the VM's Interface.
+      This network MUST already exist.
+    display_label: Network Name
+    type: string
+  os_type:
+    default: UBUNTU22.04
+    hidden: true
+    type: string
+  ssh_private_key_secret_name:
+    description: Name of the secret in the Native Edge Orchestrator containing an
+      SSH private key for the deployed VM.
+    display_label: SSH Private Key Secret Name
+    type: secret_key
+  ssh_public_key_secret_name:
+    description: Name of the secret in the Native Edge Orchestrator containing an
+      SSH private key for the deployed VM.
+    display_label: SSH Public Key Secret Name
+    type: secret_key
+  storage:
+    default: 400Gb
+    description: Amount of storage, in GB, for the deployed VM.
+    display_label: Storage
+    type: string
+  vm_resources:
+    description: Per-VM CPU and memory values based on telemetry
+    type: dict
+  vm_ip_key:
+    description: Key in vm_resources mapping to select CPU/memory (e.g., 172.27.50.159)
+    type: string
+labels:
+  csys-obj-type:
+    values:
+    - environment
+  solution:
+    values:
+    - nginx
+  target_environment:
+    values:
+    - ece
+node_templates:
+  harbor:
+    interfaces:
+      nativeedge.interfaces.lifecycle:
+        start:
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            fabric_env:
+              host_string:
+                get_attribute:
+                - vm_ssh_proxy_01
+                - eo_proxy_url
+              key:
+                get_secret:
+                  get_attribute:
+                  - vm_nativeedge_01
+                  - capabilities
+                  - vm_ssh_key_secret_name
+              port:
+                get_attribute:
+                - vm_ssh_proxy_01
+                - eo_proxy_port
+              user:
+                get_attribute:
+                - vm_nativeedge_01
+                - capabilities
+                - vm_username
+            process:
+              env:
+                VM_IP:
+                  get_attribute:
+                  - vm_node_01
+                  - capabilities
+                  - vm_public_ip
+            script_path: scripts/wget.sh
+    relationships:
+    - target: vm_node_01
+      type: nativeedge.relationships.depends_on
+    type: nativeedge.nodes.Root
+tosca_definitions_version: nativeedge_1_0

@@ -1,0 +1,206 @@
+node_templates:
+  binary_image:
+    interfaces:
+      nativeedge.interfaces.lifecycle:
+        create:
+          implementation: nativeedge.nativeedge_plugin.tasks.upload_binary
+        delete:
+          implementation: nativeedge.nativeedge_plugin.tasks.delete_binary
+        precreate:
+          implementation: nativeedge.nativeedge_plugin.tasks.validate_binary_image_config
+    properties:
+      binary_image_config:
+        artifact:
+          access_token:
+            get_input: binary_image_artifact_access_token
+          path:
+            get_input: binary_image_artifact_url
+          username:
+            get_input: binary_image_artifact_usename
+        version: '1.0'
+    type: nativeedge.nodes.template.BinaryImage
+  netplan_configuration:
+    properties:
+      resource_config:
+        users:
+        - name: ubuntu
+          shell: /bin/bash
+          ssh-authorized-keys:
+          - get_input: ssh_public_key_secret_name
+    type: nativeedge.nodes.CloudInit.CloudConfig
+  vm_nativeedge_01:
+    properties:
+      resource_config:
+        blueprint:
+          external_resource: true
+          id: Virtual_Machine_with_cloud-init_for_NativeEdge_Endpoint
+        deployment:
+          inputs:
+            cloudinit: {}
+            cpu:
+              get_attribute:
+              - resource_selector
+              - selected_cpu
+            disk:
+              get_input: disk
+            enable_management: true
+            gpu: []
+            hardware_options.firmware_type: BIOS
+            hardware_options.secure_boot: false
+            hardware_options.vTPM: false
+            image:
+              get_attribute:
+              - binary_image
+              - binary_details
+              - extra
+              - artifact_id
+            iso_files: []
+            key_private_secret_name:
+              get_input: ssh_private_key_secret_name
+            key_public_secret_name:
+              get_input: ssh_public_key_secret_name
+            memory:
+              get_attribute:
+              - resource_selector
+              - selected_memory
+            name:
+              get_input: name
+            netplan_cloudinit:
+              network:
+                ethernets:
+                  enp1s0:
+                    dhcp-identifier: mac
+                    dhcp4: true
+                  enp2s0:
+                    dhcp4: true
+                    dhcp4-overrides:
+                      use-routes: false
+                renderer: networkd
+                version: 2
+            network_settings:
+            - name: VNIC1
+              segment_name:
+                get_input: network_name
+            os_type:
+              get_input: os_type
+            serial_port: []
+            service_tag:
+              get_environment_capability: ece_service_tag
+            storage:
+              get_input: storage
+            usb: []
+            video: []
+            vm_user_name: ubuntu
+    relationships:
+    - target: binary_image
+      type: nativeedge.relationships.depends_on
+    - target: netplan_configuration
+      type: nativeedge.relationships.depends_on
+    - type: nativeedge.relationships.depends_on
+      target: resource_selector
+    type: nativeedge.nodes.ServiceComponent
+  vm_node_01:
+    interfaces:
+      nativeedge.interfaces.lifecycle:
+        start:
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            fabric_env:
+              host_string:
+                get_attribute:
+                - vm_ssh_proxy_01
+                - eo_proxy_url
+              key:
+                get_secret:
+                  get_attribute:
+                  - vm_nativeedge_01
+                  - capabilities
+                  - vm_ssh_key_secret_name
+              port:
+                get_attribute:
+                - vm_ssh_proxy_01
+                - eo_proxy_port
+              user:
+                get_attribute:
+                - vm_nativeedge_01
+                - capabilities
+                - vm_username
+            process:
+              env:
+                VM_HOST:
+                  get_attribute:
+                  - vm_ssh_proxy_01
+                  - eo_proxy_url
+                VM_NAME:
+                  get_attribute:
+                  - vm_nativeedge_01
+                  - capabilities
+                  - vm_name
+                VM_SSH_PORT:
+                  get_attribute:
+                  - vm_ssh_proxy_01
+                  - eo_proxy_port
+                VM_USERNAME:
+                  get_attribute:
+                  - vm_nativeedge_01
+                  - capabilities
+                  - vm_username
+            script_path: scripts/get_vm_info.sh
+    relationships:
+    - target: vm_ssh_proxy_01
+      type: nativeedge.relationships.depends_on
+    type: nativeedge.nodes.Root
+  vm_ssh_proxy_01:
+    interfaces:
+      nativeedge.interfaces.lifecycle:
+        check_drift:
+          implementation: scripts/check_drift.py
+        create:
+          implementation: nativeedge.nativeedge_plugin.tasks.get_eo_proxy
+          inputs:
+            port: 22
+            serviceTag:
+              get_attribute:
+              - vm_nativeedge_01
+              - capabilities
+              - service_tag
+            vmRef:
+              get_attribute:
+              - vm_nativeedge_01
+              - capabilities
+              - vm_name
+          max_retries: 10
+        update:
+          implementation: nativeedge.nativeedge_plugin.tasks.get_eo_proxy
+          inputs:
+            port: 22
+            serviceTag:
+              get_attribute:
+              - vm_nativeedge_01
+              - capabilities
+              - service_tag
+            vmRef:
+              get_attribute:
+              - vm_nativeedge_01
+              - capabilities
+              - vm_name
+          max_retries: 10
+    relationships:
+    - target: vm_nativeedge_01
+      type: nativeedge.relationships.depends_on
+    type: nativeedge.nodes.Root
+  resource_selector:
+    type: nativeedge.nodes.Root
+    interfaces:
+      nativeedge.interfaces.lifecycle:
+        configure:
+          implementation: nativeedge.bash.runner.run
+          inputs:
+            script_path: scripts/select_resources.py
+            process:
+              args: []
+              env: {}
+            vm_resources:
+              get_input: vm_resources
+            vm_ip_key:
+              get_input: vm_ip_key
