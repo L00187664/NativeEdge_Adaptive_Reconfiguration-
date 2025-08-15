@@ -1,3 +1,7 @@
 # run prometheus to opa pyhon jobs at every 1 minute
 
 * * * * * /usr/bin/python3 /home/ubuntu/prom_to_opa.py >> /home/ubuntu/opa_decisions.log 2>&1
+
+# this job is for checking the input.yaml file and then update the blueprint and deplyement 
+
+* * * * * /home/ubuntu/deployement.sh --inputs /home/ubuntu/inputs.yaml --blueprint neo_vm_kiran_updated_full --deployment my_vm_test --mode update_existing >> /var/log/auto_deploy.log 2>&1

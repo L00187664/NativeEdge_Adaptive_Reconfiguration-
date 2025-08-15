@@ -1,2 +1,3 @@
 #upload a rego policy 
 curl -X PUT --data-binary @/home/ubuntu/opa/policies/new_adaptive.rego   localhost:8181/v1/policies/adaptive
+curl -X PUT --data-binary @/home/ubuntu/opa/policies/node_failure_new.rego   localhost:8181/v1/policies/adaptive
